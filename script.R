@@ -19,12 +19,115 @@ file5$sample <- abs(file5$sample)
 secret <- read.csv('secret.csv')
 secret$sample <- abs(secret$sample)
 
+# To avoid errors by limiting the optimizer of 'fitdistr' to c(0,0)
+# It still does not work perfectly with c(0,0) so a really small value is used (epsilon)
+eps <- sqrt(.Machine$double.eps)
+
+
+################################
+# FUNCTIONS
+################################
+
+#################################################################################
+# Function that gets known letters
+# params: "ds" = matrix containing the known letters per file
+#         "files" = vector of all the files needed
+# returns: matrix "tmp_mapping" with the parameters corresponding to each letter
+#################################################################################
+
+get_mapping <- function(ds, files){
+  
+  # Matrix to put in the letters
+  shapes <- double(26)
+  rates <- double(26)
+  tmp_mapping <- data.frame(letters, shapes, rates, row.names=letters)
+  
+  # Iterate over the various files
+  for (i in 1:length(files)) {
+    # Iterate over letters in each file
+    for (j in 1:ncol(ds)){
+      # Use indexes to correctly slice the data (get the N samples representing one letter)
+      ind1 <- N*(j-1) + 1
+      ind2 <- N*j
+      samp <- files[i]$sample[ind1:ind2]
+      
+      # Fit distribution: lower is used to avoid warning (sometimes optimizer searches in negative space)
+      # If condition used to avoid using mean when a letter is first encountered
+      if (tmp_mapping[ds[i, j],2] == 0.0){
+        tmp_mapping[ds[i, j],2] <- fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[1]]
+      } else {
+        tmp_mapping[ds[i, j],2] <- mean(c(fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[1]], tmp_mapping[ds[i, j],2]))
+      }
+      
+      if (tmp_mapping[ds[i, j],3] == 0.0){
+        tmp_mapping[ds[i, j],3] = fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[2]]
+      } else {
+        tmp_mapping[ds[i, j],3] = mean(c(fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[2]], tmp_mapping[ds[i, j],3]))
+      }
+    }
+  }
+  
+  return(tmp_mapping)
+}
+
+
+############################################################
+# Function that decodes the message
+# params: "sec" = secret message
+#         "map" = the mapping character to gamma parameters
+# returns: vector "tmp_message" with the decoded message
+############################################################
+
+decrypt <- function(sec, map){
+  # Variable storing the decrypted message
+  tmp_message <- c()
+  
+  # Iterate over the representations of the letters in the secret message
+  for (i in 1:(length(sec$sample)/N)){
+    # Instantiate indexes and a control variable (checks wether a letter can be decripted)
+    ind1 <- N*(i-1) + 1
+    ind2 <- N*i
+    control <- FALSE
+    
+    # Find the parameters for the sample in secret message
+    tmp_shape <- fitdistr(sec$sample[ind1:ind2], densfun="gamma", lower=c(eps,eps))$estimate[[1]]
+    tmp_rate <- fitdistr(sec$sample[ind1:ind2], densfun="gamma", lower=c(eps,eps))$estimate[[2]]
+    
+    # Iterate over the discovered letters in the map and check with empirical threshold if the parameters are compatible
+    for (l in letters){
+      shape_diff <- abs(map[l, 2] - tmp_shape)
+      rate_diff <- abs(map[l, 3] - tmp_rate)
+      if (shape_diff <= 0.3){
+        if (rate_diff <= 0.04){
+          tmp_message <- c(tmp_message, l)
+          control <- TRUE
+          break
+        }
+      }
+    }
+    
+    # If no letter is found append an asterisk
+    if (!control){
+      tmp_message <- c(tmp_message, "*")
+    }
+  }
+  
+  return(tmp_message)
+}
+
+
+
+##########################################
+# Apply functions to solve the assignment
+##########################################
+
+
 #######################
 # Find right N
 #######################
 
 # Plot one example to get fixed number of samples for one character
-plot(abs(file5$sample))
+plot(abs(file5$sample), xlab="Index", ylab="Value")
 file_len <- as.numeric(as.character(length(file1$sample)))
 N <- file_len/8
 
@@ -32,13 +135,6 @@ N <- file_len/8
 #######################
 # Find known letters
 #######################
-
-# Matrix to put in the letters
-# Dimension of each letter's parameter (both shapes and rates) to the maximum appearance frequency (5)
-shapes <- double(26)
-rates <- double(26)
-
-mapping <- data.frame(letters, shapes, rates, row.names=letters)
 
 # Letters in files
 file1_char <- c("c", "r", "b", "m", "f", "j", "i", "e")
@@ -48,80 +144,22 @@ file4_char <- c("k", "u", "v", "y", "p", "j", "a", "q")
 file5_char <- c("m", "j", "p", "n", "t", "x", "s", "i")
 
 # Build matrix of known characrers and vector of files
-ds <- matrix(c(file1_char, file2_char, file3_char, file4_char, file5_char), nrow=5, ncol=8, byrow=TRUE)
-files <- c(file1, file2, file3, file4, file5)
+known_characters <- matrix(c(file1_char, file2_char, file3_char, file4_char, file5_char), nrow=5, ncol=8, byrow=TRUE)
+files_list <- c(file1, file2, file3, file4, file5)
 
-# To avoid errors by limiting the optimizer of 'fitdistr' to c(0,0)
-eps <- sqrt(.Machine$double.eps)
-
-# Iterate over the various files
-for (i in 1:5) {
-  # Iterate over letters in each file
-  for (j in 1:8){
-    # Use indexes to correctly slice the data
-    ind1 <- 10000*(j-1) + 1
-    ind2 <- 10000*j
-    samp <- files[i]$sample[ind1:ind2]
-    
-    # Condition to avoid applying mean on first value insertion (cause vector has 0 in it)
-    # Fit distribution: lower is used to avoid warning (sometimes optimizer searches in negative space)
-    if (mapping[ds[i, j],2]==0) {
-      mapping[ds[i, j],2] = fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[1]]
-    } else {
-      mapping[ds[i, j],2] = mean(fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[1]])
-    }
-    
-    if (mapping[ds[i, j],3]==0) {
-      mapping[ds[i, j],3] = fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[2]]
-    } else {
-      mapping[ds[i, j],3] = mean(fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[2]])
-    }
-  }
-}
+mapping <- get_mapping(known_characters, files_list)
 
 
 #######################
 # Decryptate message
 #######################
-# Variable storing the decrypted message
-message <- c()
-
-# Iterate over the representations of the letters
-for (i in 1:49){
-  # Instantiate indexes and a control variable (checks wether a letter can be decripted)
-  ind1 <- 10000*(i-1) + 1
-  ind2 <- 10000*i
-  control <- FALSE
-  
-  # Find the parameters for the sample in secret message
-  tmp_shape <- fitdistr(secret$sample[ind1:ind2], densfun="gamma", lower=c(eps,eps))$estimate[[1]]
-  tmp_rate <- fitdistr(secret$sample[ind1:ind2], densfun="gamma", lower=c(eps,eps))$estimate[[2]]
-  
-  # Iterate over the discovered letters in the map and check with empirical threshold if the parameters are compatible
-  for (l in letters){
-    shape_diff <- abs(mapping[l, 2] - tmp_shape)
-    rate_diff <- abs(mapping[l, 3] - tmp_rate)
-    if (shape_diff <= 0.2){
-      if (rate_diff <= 0.03){
-        message <- c(message, l)
-        control <- TRUE
-        break
-      }
-    }
-  }
-  
-  # If no letter is found append an asterisk
-  if (!control){
-    message <- c(message, "*")
-  }
-}
-
-print(message)
+message <- decrypt(secret, mapping)
 
 
-#####################################
-# Inferring letters from the message
-#####################################
+###########################################
+# Inferring other letters from the message
+###########################################
+
 # Letter in position 7 is a 'w'
 mapping['w', 2] <- fitdistr(secret$sample[60001:70000], densfun="gamma", lower=c(eps,eps))$estimate[[1]]
 mapping['w', 3] <- fitdistr(secret$sample[60001:70000], densfun="gamma", lower=c(eps,eps))$estimate[[2]]
