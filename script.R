@@ -126,8 +126,7 @@ decrypt <- function(sec, map){
 # Find right N
 #######################
 
-# Plot one example to get fixed number of samples for one character
-plot(abs(file5$sample), xlab="Index", ylab="Value")
+# Since it's a constant and there are 8 letters and 80k samples in a file it's 10k
 file_len <- as.numeric(as.character(length(file1$sample)))
 N <- file_len/8
 
@@ -172,3 +171,44 @@ mapping['z', 3] <- fitdistr(secret$sample[340001:350000], densfun="gamma", lower
 mapping['d', 2] <- fitdistr(secret$sample[480001:490000], densfun="gamma", lower=c(eps,eps))$estimate[[1]]
 mapping['d', 3] <- fitdistr(secret$sample[480001:490000], densfun="gamma", lower=c(eps,eps))$estimate[[2]]
 
+
+#########
+# Plots
+#########
+
+# Plot of file5, to visually see that the constant N is 10000
+plot(abs(file5$sample), xlab="Index", ylab="Value", cex.lab=1.5, cex.axis=1.5)
+
+# Plot the two example letters to prove that even if one parameter is close (shape),
+# as the other (rate) is very different the resulting curves are very different
+# Generate two samples with the refined parameters obtained
+a_sample <- rgamma(N, mapping['a', 2], mapping['a', 3])
+b_sample <- rgamma(N, mapping['b', 2], mapping['b', 3])
+
+# Plot them in the same figure
+plot(density(a_sample), col = "red",
+     xlab="Value", ylab="Probability", main=NA,
+     cex.lab=1.5, cex.axis=1.5)
+lines(density(b_sample), col = "blue")
+legend(15, 0.7, legend=c("Letter a", "Letter b"), col=c("red", "blue"), lty=1:2, cex=1.5)
+
+
+############################################
+# Obtain csv to get latex table with script
+############################################
+
+# Transform the matrix into a dataframe and change column names accordingly
+mapping_df <- as.data.frame(mapping)
+names(mapping_df) <- c("letter", "alpha", "lambda")
+
+# Reverse rate and get the parameter scale, which is the lambda in the task
+mapping_df$lambda <- 1/mapping_df$lambda
+
+# Drop unknown letters' rows
+mapping_df <- mapping_df[mapping_df$alpha>0, ]
+
+# Write to csv the example table with only 2 characters
+write.csv(mapping_df[mapping_df$letter == "a" || mapping_df$letter == "b", ], file="example.csv")
+
+# Write to csv the complete table
+write.csv(mapping_df, file="mapping.csv")

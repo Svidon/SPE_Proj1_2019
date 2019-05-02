@@ -2,4 +2,7 @@
 .Rhistory
 table.py
 table.R
-constant_plot.pdf
+*.pdf
+!assignment_1.pdf
+*.csv
+!secret.csv
