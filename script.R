@@ -184,13 +184,17 @@ plot(abs(file5$sample), xlab="Index", ylab="Value", cex.lab=1.5, cex.axis=1.5)
 # Generate two samples with the refined parameters obtained
 a_sample <- rgamma(N, mapping['a', 2], mapping['a', 3])
 b_sample <- rgamma(N, mapping['b', 2], mapping['b', 3])
+l_sample <- rgamma(N, mapping['l', 2], mapping['l', 3])
+r_sample <- rgamma(N, mapping['r', 2], mapping['r', 3])
 
 # Plot them in the same figure
-plot(density(a_sample), col = "red",
+plot(density(l_sample), col = "red",
      xlab="Value", ylab="Probability", main=NA,
-     cex.lab=1.5, cex.axis=1.5)
-lines(density(b_sample), col = "blue")
-legend(15, 0.7, legend=c("Letter a", "Letter b"), col=c("red", "blue"), lty=1:2, cex=1.5)
+     cex.lab=1.5, cex.axis=1.5, lwd=2)
+lines(density(b_sample), col = "blue", lwd=2)
+lines(density(a_sample), col = "green", lwd=2)
+lines(density(r_sample), col = "purple", lwd=2)
+legend(6, 2.0, legend=c("Letter l", "Letter b", "Letter a", "Letter r"), col=c("red", "blue", "green", "purple"), lty=1:2, cex=1.5)
 
 
 ############################################
@@ -208,7 +212,8 @@ mapping_df$lambda <- 1/mapping_df$lambda
 mapping_df <- mapping_df[mapping_df$alpha>0, ]
 
 # Write to csv the example table with only 2 characters
-write.csv(mapping_df[mapping_df$letter == "a" || mapping_df$letter == "b", ], file="example.csv")
+write.csv(mapping_df[mapping_df$letter == "a" || mapping_df$letter == "b" || mapping_df$letter == "l"
+                     || mapping_df$letter == "r", ], file="example.csv")
 
 # Write to csv the complete table
 write.csv(mapping_df, file="mapping.csv")
