@@ -182,6 +182,7 @@ plot(abs(file5$sample), xlab="Index", ylab="Value", cex.lab=1.5, cex.axis=1.5)
 # Plot the two example letters to prove that even if one parameter is close (shape),
 # as the other (rate) is very different the resulting curves are very different
 # Generate two samples with the refined parameters obtained
+set.seed(1)
 a_sample <- rgamma(N, mapping['a', 2], mapping['a', 3])
 b_sample <- rgamma(N, mapping['b', 2], mapping['b', 3])
 l_sample <- rgamma(N, mapping['l', 2], mapping['l', 3])
@@ -190,11 +191,11 @@ r_sample <- rgamma(N, mapping['r', 2], mapping['r', 3])
 # Plot them in the same figure
 plot(density(l_sample), col = "red",
      xlab="Value", ylab="Probability", main=NA,
-     cex.lab=1.5, cex.axis=1.5, lwd=2)
-lines(density(b_sample), col = "blue", lwd=2)
-lines(density(a_sample), col = "green", lwd=2)
-lines(density(r_sample), col = "purple", lwd=2)
-legend(6, 2.0, legend=c("Letter l", "Letter b", "Letter a", "Letter r"), col=c("red", "blue", "green", "purple"), lty=1:2, cex=1.5)
+     cex.lab=1.5, cex.axis=1.5, lwd=3)
+lines(density(b_sample), col = "blue", lwd=3)
+lines(density(a_sample), col = "green", lwd=3)
+lines(density(r_sample), col = "purple", lwd=3)
+legend(6, 2.0, legend=c("Letter l", "Letter b", "Letter a", "Letter r"), col=c("red", "blue", "green", "purple"), lty=1:1, cex=1.5, lwd=3)
 
 
 ############################################
