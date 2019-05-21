@@ -52,17 +52,20 @@ get_mapping <- function(ds, files){
       samp <- files[i]$sample[ind1:ind2]
       
       # Fit distribution: lower is used to avoid warning (sometimes optimizer searches in negative space)
+      tmp_shape <- fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[1]]
+      tmp_rate <- fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[2]]
+      
       # If condition used to avoid using mean when a letter is first encountered
       if (tmp_mapping[ds[i, j],2] == 0.0){
-        tmp_mapping[ds[i, j],2] <- fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[1]]
+        tmp_mapping[ds[i, j],2] <- tmp_shape
       } else {
-        tmp_mapping[ds[i, j],2] <- mean(c(fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[1]], tmp_mapping[ds[i, j],2]))
+        tmp_mapping[ds[i, j],2] <- mean(c(tmp_shape, tmp_mapping[ds[i, j],2]))
       }
       
       if (tmp_mapping[ds[i, j],3] == 0.0){
-        tmp_mapping[ds[i, j],3] = fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[2]]
+        tmp_mapping[ds[i, j],3] = tmp_rate
       } else {
-        tmp_mapping[ds[i, j],3] = mean(c(fitdistr(samp, densfun ="gamma", lower=c(eps,eps))$estimate[[2]], tmp_mapping[ds[i, j],3]))
+        tmp_mapping[ds[i, j],3] = mean(c(tmp_rate, tmp_mapping[ds[i, j],3]))
       }
     }
   }
@@ -88,10 +91,116 @@ decrypt <- function(sec, map){
     ind1 <- N*(i-1) + 1
     ind2 <- N*i
     control <- FALSE
+    samp <- sec$sample[ind1:ind2]
     
     # Find the parameters for the sample in secret message
-    tmp_shape <- fitdistr(sec$sample[ind1:ind2], densfun="gamma", lower=c(eps,eps))$estimate[[1]]
-    tmp_rate <- fitdistr(sec$sample[ind1:ind2], densfun="gamma", lower=c(eps,eps))$estimate[[2]]
+    tmp_shape <- fitdistr(samp, densfun="gamma", lower=c(eps,eps))$estimate[[1]]
+    tmp_rate <- fitdistr(samp, densfun="gamma", lower=c(eps,eps))$estimate[[2]]
+    
+    # Iterate over the discovered letters in the map and check with empirical threshold if the parameters are compatible
+    for (l in letters){
+      shape_diff <- abs(map[l, 2] - tmp_shape)
+      rate_diff <- abs(map[l, 3] - tmp_rate)
+      if (shape_diff <= 0.3){
+        if (rate_diff <= 0.04){
+          tmp_message <- c(tmp_message, l)
+          control <- TRUE
+          break
+        }
+      }
+    }
+    
+    # If no letter is found append an asterisk
+    if (!control){
+      tmp_message <- c(tmp_message, "*")
+    }
+  }
+  
+  return(tmp_message)
+}
+
+
+###################################
+# FUNCTIONS FOR METHOD OF MOMENTS
+###################################
+
+#################################################################################
+# Function that gets known letters
+# params: "ds" = matrix containing the known letters per file
+#         "files" = vector of all the files needed
+# returns: matrix "tmp_mapping" with the parameters corresponding to each letter
+#################################################################################
+
+get_mapping_mom <- function(ds, files){
+  
+  # Matrix to put in the letters
+  shapes <- double(26)
+  rates <- double(26)
+  tmp_mapping <- data.frame(letters, shapes, rates, row.names=letters)
+  
+  # Iterate over the various files
+  for (i in 1:length(files)) {
+    # Iterate over letters in each file
+    for (j in 1:ncol(ds)){
+      # Use indexes to correctly slice the data (get the N samples representing one letter)
+      ind1 <- N*(j-1) + 1
+      ind2 <- N*j
+      samp <- files[i]$sample[ind1:ind2]
+      
+      # Get mean and variance of sample
+      m <- mean(samp)
+      v <- var(samp)
+      
+      # Use moments to estimate the two parameters
+      tmp_shape <- m*m/v
+      tmp_rate <- m/v
+      
+      # Fit distribution: lower is used to avoid warning (sometimes optimizer searches in negative space)
+      # If condition used to avoid using mean when a letter is first encountered
+      if (tmp_mapping[ds[i, j],2] == 0.0){
+        tmp_mapping[ds[i, j],2] <- tmp_shape
+      } else {
+        tmp_mapping[ds[i, j],2] <- mean(c(tmp_shape, tmp_mapping[ds[i, j],2]))
+      }
+      
+      if (tmp_mapping[ds[i, j],3] == 0.0){
+        tmp_mapping[ds[i, j],3] = tmp_rate
+      } else {
+        tmp_mapping[ds[i, j],3] = mean(c(tmp_rate, tmp_mapping[ds[i, j],3]))
+      }
+    }
+  }
+  
+  return(tmp_mapping)
+}
+
+
+############################################################
+# Function that decodes the message
+# params: "sec" = secret message
+#         "map" = the mapping character to gamma parameters
+# returns: vector "tmp_message" with the decoded message
+############################################################
+
+decrypt_mom <- function(sec, map){
+  # Variable storing the decrypted message
+  tmp_message <- c()
+  
+  # Iterate over the representations of the letters in the secret message
+  for (i in 1:(length(sec$sample)/N)){
+    # Instantiate indexes and a control variable (checks wether a letter can be decripted)
+    ind1 <- N*(i-1) + 1
+    ind2 <- N*i
+    control <- FALSE
+    samp <- sec$sample[ind1:ind2]
+    
+    # Get mean and variance of sample
+    m <- mean(samp)
+    v <- var(samp)
+    
+    # Use moments to estimate the two parameters
+    tmp_shape <- m*m/v
+    tmp_rate <- m/v
     
     # Iterate over the discovered letters in the map and check with empirical threshold if the parameters are compatible
     for (l in letters){
@@ -117,9 +226,13 @@ decrypt <- function(sec, map){
 
 
 
-##########################################
+############################################################################
 # Apply functions to solve the assignment
-##########################################
+############################################################################
+# It is resolved with MLE, but functions for the usage of Method of Moments
+# do exist (just add suffix '_mom' to function name).
+# Result will be just slightly different
+############################################################################
 
 
 #######################
@@ -146,13 +259,16 @@ file5_char <- c("m", "j", "p", "n", "t", "x", "s", "i")
 known_characters <- matrix(c(file1_char, file2_char, file3_char, file4_char, file5_char), nrow=5, ncol=8, byrow=TRUE)
 files_list <- c(file1, file2, file3, file4, file5)
 
+# Use 'get_mapping' to use MLE or use 'get_mapping_mom' to use MOM
 mapping <- get_mapping(known_characters, files_list)
 
 
 #######################
 # Decryptate message
 #######################
+# Use 'decrypt' to use MLE or use 'decrypt_mom' to use MOM
 message <- decrypt(secret, mapping)
+print(message)
 
 
 ###########################################
@@ -218,3 +334,9 @@ write.csv(mapping_df[mapping_df$letter == "a" || mapping_df$letter == "b" || map
 
 # Write to csv the complete table
 write.csv(mapping_df, file="mapping.csv")
+
+# Find parameters with MOM method and write them to csv
+mom_param <- as.data.frame(get_mapping_mom(known_characters, files_list))
+names(mom_param) <- c("letter", "alpha", "lambda")
+mom_param$lambda <- 1/mom_param$lambda
+write.csv(mom_param, file="mom_parameters.csv")
