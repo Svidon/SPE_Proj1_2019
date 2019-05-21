@@ -4,5 +4,6 @@ table.py
 table.R
 *.pdf
 !assignment_1.pdf
+!report.pdf
 *.csv
 !secret.csv
