@@ -311,7 +311,7 @@ plot(density(l_sample), col = "red",
 lines(density(b_sample), col = "blue", lwd=3)
 lines(density(a_sample), col = "green", lwd=3)
 lines(density(r_sample), col = "purple", lwd=3)
-legend(6, 2.0, legend=c("Letter l", "Letter b", "Letter a", "Letter r"), col=c("red", "blue", "green", "purple"), lty=1:1, cex=1.5, lwd=3)
+legend(5.7, 2.0, legend=c("Letter l", "Letter b", "Letter a", "Letter r"), col=c("red", "blue", "green", "purple"), lty=1:1, cex=1.5, lwd=3)
 
 
 ############################################
